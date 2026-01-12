@@ -35,10 +35,15 @@ def main():
     psi0 = solve_torus_fvm(Nl, Nt, delta=delta, Phi=0.0)
     print("Sanity A (Phi=0): max|psi-1| = ", np.max(np.abs(psi0 - 1.0)))
 
+    print("psi0 min/max:", psi0.min(), psi0.max())
+
     # -------------------------
     # Baseline solve
     # -------------------------
     psi = solve_torus_fvm(Nl, Nt, delta=delta, Phi=Phi)
+
+    # ---- Sanity check B: bounds of solution ----
+    print("psi min/max:", psi.min(), psi.max())
 
     # Q2: contour/heatmap on cross-section
     plot_cross_section_polar(psi, Nl, Nt, cmap=cmap)
@@ -96,8 +101,14 @@ def H(delta, lam, theta):
 # ---------------------------------------------------------------------
 def solve_torus_fvm(Nl, Nt, delta, Phi):
     A, b = build_system(Nl, Nt, delta, Phi)
+
+    print("A diag min/max:", np.min(np.diag(A)), np.max(np.diag(A)))
+    print("Any NaN in A?", np.isnan(A).any(), "Any inf in A?", np.isinf(A).any())
+    print("Any NaN in b?", np.isnan(b).any(), "Any inf in b?", np.isinf(b).any())
+
     x = np.linalg.solve(A, b)
     return x.reshape((Nl, Nt))
+
 
 
 def build_system(Nl, Nt, delta, Phi):
@@ -150,10 +161,8 @@ def build_system(Nl, Nt, delta, Phi):
             aS = Acw  / (lamP * dth)
 
             aP = aE + aW + aN + aS + (Phi**2) * Vp
-            # --- Fix outer Dirichlet distance: boundary is dl/2 away
-            if i == Nl - 1:
-                aE = Ao / (dl/2.0)   # stronger coupling to boundary
-
+            
+            
             # -------------------------
             # Radial boundary handling
             # -------------------------
@@ -167,10 +176,10 @@ def build_system(Nl, Nt, delta, Phi):
                 # Outer boundary at λ=1: psi = 1 (Dirichlet).
                 # Treat "east" neighbor as boundary value.
                 # Move aE * psi_bc to RHS and remove the neighbor coupling.
-                psi_bc = 1.0
-                b[p] += aE * psi_bc
-                aE = 0.0
-                aP = aW + aN + aS + (Phi**2) * Vp
+                A[p, :] = 0.0
+                A[p, p] = 1.0
+                b[p] = 1.0
+                continue 
 
             # -------------------------
             # Fill matrix row
@@ -201,30 +210,22 @@ def build_system(Nl, Nt, delta, Phi):
 # Post-processing
 # ---------------------------------------------------------------------
 def plot_cross_section_polar(psi, Nl, Nt, cmap):
-    lam_c, th_c = grid_centers(Nl, Nt)
     dl, dth, lam_w, lam_e, th_s, th_n = grid_faces(Nl, Nt)
 
-    # build face grids for pcolormesh: (Nt+1) x (Nl+1)
-    Lam_f, Th_f = np.meshgrid(
-        np.r_[lam_w, 1.0],          # λ faces: include outer boundary at 1
-        np.r_[th_s, 2*np.pi],       # θ faces: include 2π closure
-        indexing='ij'
-    )
-
-    # extend psi to close periodic seam in theta
-    psi_plot = np.hstack([psi, psi[:, :1]])  # (Nl, Nt+1)
+    r_edges = np.r_[lam_w, 1.0]        # length Nl+1
+    th_edges = np.r_[th_s, 2*np.pi]    # length Nt+1
 
     fig = plt.figure(dpi=144)
     ax = fig.add_subplot(111, projection='polar')
 
-    pcm = ax.pcolormesh(Th_f.T, Lam_f.T, psi_plot.T, shading='auto', cmap=cmap)
+    # C must be (Nl, Nt): rows=r, cols=theta
+    pcm = ax.pcolormesh(th_edges, r_edges, psi, shading='auto', cmap=cmap)
     fig.colorbar(pcm, ax=ax, label=r'$\psi$ [-]')
 
     ax.set_title('Q2: Dimensionless concentration profile (polar)')
     ax.set_rlabel_position(90)
     plt.tight_layout()
     plt.show()
-
 
 
 def extract_lines(psi, lam, theta):
