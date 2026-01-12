@@ -7,7 +7,7 @@ try:
 except Exception:
     iv = None
 
-sdsdsd
+
 def main():
     # -------------------------
     # Physical parameters
