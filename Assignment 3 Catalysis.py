@@ -41,20 +41,21 @@ def main():
     psi = solve_torus_fvm(Nl, Nt, delta=delta, Phi=Phi)
 
     # Q2: contour/heatmap on cross-section
-    plot_cross_section(psi, Nl, Nt, r0=r0, R0=R0, c_bulk=c_bulk, cmap=cmap)
+    plot_cross_section_polar(psi, Nl, Nt, cmap=cmap)
 
     # Q3: radial line at theta=0 and theta=pi
     lam, theta = grid_centers(Nl, Nt)
     lam_line, psi_t0, psi_tpi = extract_lines(psi, lam, theta)
-    plot_lines(lam_line * r0, psi_t0 * c_bulk, psi_tpi * c_bulk,
-               title="Q3: radial profiles at θ=0 and θ=π")
+    plot_lines(lam_line, psi_t0, psi_tpi,
+           xlabel=r'$\lambda$ [-]', ylabel=r'$\psi$ [-]',
+           title="Q3: radial profiles at θ=0 and θ=π")
 
     # Q4: compare with sphere and cylinder
-    plot_compare_sphere_cyl(lam_line, psi_t0, psi_tpi, Phi, c_bulk)
+    plot_compare_sphere_cyl(lam_line, psi_t0, psi_tpi, Phi)
 
     # Q5/Q6: sweep R0
     R0_list = np.array([0.015, 0.03, 0.06, 0.12])  # m
-    sweep_major_radius(R0_list, r0, Phi, Nl, Nt, c_bulk)
+    sweep_major_radius(R0_list, r0, Phi, Nl, Nt)
 
 
 # ---------------------------------------------------------------------
@@ -65,7 +66,7 @@ def grid_centers(Nl, Nt):
     dth = 2.0 * np.pi / Nt
 
     lam = np.linspace(dl/2, 1.0 - dl/2, Nl)        # λ_P
-    theta = np.linspace(-np.pi + dth/2, np.pi - dth/2, Nt)  # θ_P (poloidal)
+    theta = np.linspace(0.0 + dth/2, 2.0*np.pi - dth/2, Nt)  # θ_P (poloidal)
     return lam, theta
 
 
@@ -75,7 +76,7 @@ def grid_faces(Nl, Nt):
 
     lam_w = np.linspace(0.0, 1.0 - dl, Nl)         # west face λ_w
     lam_e = lam_w + dl                              # east face λ_e
-    th_s = np.linspace(-np.pi, np.pi - dth, Nt)     # south face θ_s
+    th_s  = np.linspace(0.0, 2.0*np.pi - dth, Nt)     # south face θ_s
     th_n = th_s + dth                                # north face θ_n
     return dl, dth, lam_w, lam_e, th_s, th_n
 
@@ -149,6 +150,9 @@ def build_system(Nl, Nt, delta, Phi):
             aS = Acw  / (lamP * dth)
 
             aP = aE + aW + aN + aS + (Phi**2) * Vp
+            # --- Fix outer Dirichlet distance: boundary is dl/2 away
+            if i == Nl - 1:
+                aE = Ao / (dl/2.0)   # stronger coupling to boundary
 
             # -------------------------
             # Radial boundary handling
@@ -196,24 +200,31 @@ def build_system(Nl, Nt, delta, Phi):
 # ---------------------------------------------------------------------
 # Post-processing
 # ---------------------------------------------------------------------
-def plot_cross_section(psi, Nl, Nt, r0, R0, c_bulk, cmap):
-    lam, th = grid_centers(Nl, Nt)
-    Lam, Th = np.meshgrid(lam, th, indexing='ij')
+def plot_cross_section_polar(psi, Nl, Nt, cmap):
+    lam_c, th_c = grid_centers(Nl, Nt)
+    dl, dth, lam_w, lam_e, th_s, th_n = grid_faces(Nl, Nt)
 
-    r = r0 * Lam
-    x = (R0 + r * np.cos(Th))
-    y = r * np.sin(Th)
-    c = psi * c_bulk
+    # build face grids for pcolormesh: (Nt+1) x (Nl+1)
+    Lam_f, Th_f = np.meshgrid(
+        np.r_[lam_w, 1.0],          # λ faces: include outer boundary at 1
+        np.r_[th_s, 2*np.pi],       # θ faces: include 2π closure
+        indexing='ij'
+    )
 
-    plt.figure(dpi=144)
-    plt.pcolormesh(x, y, c, shading='auto', cmap=cmap)
-    plt.gca().set_aspect('equal', 'box')
-    plt.colorbar(label='c [mol/m$^3$]')
-    plt.xlabel('x [m]')
-    plt.ylabel('y [m]')
-    plt.title('Q2: Concentration in torus cross-section')
+    # extend psi to close periodic seam in theta
+    psi_plot = np.hstack([psi, psi[:, :1]])  # (Nl, Nt+1)
+
+    fig = plt.figure(dpi=144)
+    ax = fig.add_subplot(111, projection='polar')
+
+    pcm = ax.pcolormesh(Th_f.T, Lam_f.T, psi_plot.T, shading='auto', cmap=cmap)
+    fig.colorbar(pcm, ax=ax, label=r'$\psi$ [-]')
+
+    ax.set_title('Q2: Dimensionless concentration profile (polar)')
+    ax.set_rlabel_position(90)
     plt.tight_layout()
     plt.show()
+
 
 
 def extract_lines(psi, lam, theta):
@@ -226,13 +237,13 @@ def extract_lines(psi, lam, theta):
     return lam, psi_t0, psi_tpi
 
 
-def plot_lines(r, c_t0, c_tpi, title="Radial profiles"):
+def plot_lines(x, y1, y2, xlabel=r'$\lambda$ [-]', ylabel=r'$\psi$ [-]', title="Profiles"):
     plt.figure(dpi=144)
-    plt.plot(r, c_t0, 'o-', label=r'$\theta=0$')
-    plt.plot(r, c_tpi, 'o-', label=r'$\theta=\pi$')
+    plt.plot(x, y1, 'o-', label=r'$\theta=0$')
+    plt.plot(x, y2, 'o-', label=r'$\theta=\pi$')
     plt.grid(linestyle='--')
-    plt.xlabel('r [m]')
-    plt.ylabel('c [mol/m$^3$]')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     plt.title(title)
     plt.legend()
     plt.tight_layout()
@@ -251,22 +262,22 @@ def analytical_cylinder(lam, Phi):
     return iv(0, Phi * lam) / iv(0, Phi)
 
 
-def plot_compare_sphere_cyl(lam, psi_t0, psi_tpi, Phi, c_bulk):
+def plot_compare_sphere_cyl(lam, psi_t0, psi_tpi, Phi):
     plt.figure(dpi=144)
-    plt.plot(lam, psi_t0 * c_bulk, 'o', label=r'Torus $\theta=0$')
-    plt.plot(lam, psi_tpi * c_bulk, 'o', label=r'Torus $\theta=\pi$')
+    plt.plot(lam, psi_t0, 'o', label=r'Torus $\theta=0$')
+    plt.plot(lam, psi_tpi, 'o', label=r'Torus $\theta=\pi$')
 
-    ll = np.linspace(1e-6, 1.0, 200)
-    plt.plot(ll, analytical_sphere(ll, Phi) * c_bulk, '--', label='Sphere (analytical)')
+    ll = np.linspace(1e-6, 1.0, 400)
+    plt.plot(ll, analytical_sphere(ll, Phi), '--', label='Sphere (analytical)')
 
     if iv is not None:
-        plt.plot(ll, analytical_cylinder(ll, Phi) * c_bulk, '--', label='Cylinder (analytical)')
+        plt.plot(ll, analytical_cylinder(ll, Phi), '--', label='Cylinder (analytical)')
 
     plt.gca().invert_xaxis()
     plt.grid(linestyle='--')
     plt.xlabel(r'$\lambda$ [-]')
-    plt.ylabel('c [mol/m$^3$]')
-    plt.title('Q4: Compare torus vs sphere vs cylinder')
+    plt.ylabel(r'$\psi$ [-]')
+    plt.title('Q4: Compare torus vs sphere vs cylinder (dimensionless)')
     plt.legend()
     plt.tight_layout()
     plt.show()
@@ -276,8 +287,10 @@ def effectiveness_torus(psi, Nl, Nt, delta):
     dl, dth, _, _, _, _ = grid_faces(Nl, Nt)
     lam, th = grid_centers(Nl, Nt)
     Lam, Th = np.meshgrid(lam, th, indexing='ij')
-    Vp = 2.0 * np.pi * Lam * H(delta, Lam, Th) * dl * dth
+
+    Vp = 2.0 * np.pi * Lam * H(delta, Lam, Th) * dl * dth  # dimensionless volume weights
     return np.sum(psi * Vp) / np.sum(Vp)
+
 
 
 def effectiveness_sphere(Phi):
@@ -296,7 +309,7 @@ def effectiveness_cylinder(Phi):
     return 2.0 / Phi * (iv(1, Phi) / iv(0, Phi))
 
 
-def sweep_major_radius(R0_list, r0, Phi, Nl, Nt, c_bulk):
+def sweep_major_radius(R0_list, r0, Phi, Nl, Nt):
     etas = []
     deltas = []
 
@@ -307,24 +320,22 @@ def sweep_major_radius(R0_list, r0, Phi, Nl, Nt, c_bulk):
         lam, th = grid_centers(Nl, Nt)
         lam_line, psi_t0, psi_tpi = extract_lines(psi, lam, th)
 
-        # Plot lines for each R0
+        # Q5 dimensionless radial profiles: λ vs ψ
         plt.figure(dpi=144)
-        plt.plot(lam_line * r0, psi_t0 * c_bulk, 'o-', label=r'$\theta=0$')
-        plt.plot(lam_line * r0, psi_tpi * c_bulk, 'o-', label=r'$\theta=\pi$')
+        plt.plot(lam_line, psi_t0, 'o-', label=r'$\theta=0$')
+        plt.plot(lam_line, psi_tpi, 'o-', label=r'$\theta=\pi$')
         plt.grid(linestyle='--')
-        plt.xlabel('r [m]')
-        plt.ylabel('c [mol/m$^3$]')
-        plt.title(f'Q5: R0={R0:.3f} m (delta={delta:.1f})')
+        plt.xlabel(r'$\lambda$ [-]')
+        plt.ylabel(r'$\psi$ [-]')
+        plt.title(f'Q5: δ={delta:.1f}')
         plt.legend()
         plt.tight_layout()
         plt.show()
 
-        # Efficiency
         eta_t = effectiveness_torus(psi, Nl, Nt, delta)
         etas.append(eta_t)
         deltas.append(delta)
 
-    # Compare to sphere/cylinder (constant Phi because r0 fixed)
     eta_sph = effectiveness_sphere(Phi)
     eta_cyl = effectiveness_cylinder(Phi) if iv is not None else np.nan
 
@@ -341,6 +352,7 @@ def sweep_major_radius(R0_list, r0, Phi, Nl, Nt, c_bulk):
     plt.legend()
     plt.tight_layout()
     plt.show()
+
 
 
 if __name__ == '__main__':
