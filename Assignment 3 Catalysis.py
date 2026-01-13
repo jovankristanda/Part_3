@@ -59,7 +59,7 @@ def main():
     plot_compare_sphere_cyl(lam_line, psi_t0, psi_tpi, Phi)
 
     # Q5/Q6: sweep R0
-    R0_list = np.array([0.015, 0.03, 0.06, 0.12])  # m
+    R0_list = np.array([0.015, 0.03, 0.06, 0.12, 0.25, 0.5, 1.0])  
     sweep_major_radius(R0_list, r0, Phi, Nl, Nt)
 
 
@@ -172,15 +172,23 @@ def build_system(Nl, Nt, delta, Phi):
                 aW = 0.0
                 aP = aE + aN + aS + (Phi**2) * Vp
 
-            if i == Nl - 1:
-                # Outer boundary at λ=1: psi = 1 (Dirichlet).
-                # Treat "east" neighbor as boundary value.
-                # Move aE * psi_bc to RHS and remove the neighbor coupling.
-                A[p, :] = 0.0
-                A[p, p] = 1.0
-                b[p] = 1.0
-                continue 
+            psi_B = 1.0
 
+            if i == Nl - 1:
+                # Dirichlet at the EAST FACE (λ = 1). Distance from cell center to boundary is Δλ/2,
+                # so boundary coefficient is doubled.
+                aE_B = 2.0 * Ao / dl     # <-- IMPORTANT: half-cell distance
+
+                # Add boundary contribution to RHS, keep diffusion sink in diagonal via aP
+                b[p] += aE_B * psi_B
+
+                # Replace aE with boundary coefficient so it is included in aP,
+                # but we must NOT create an east-neighbor entry.
+                aE = aE_B
+
+                # aP must include aE (do NOT drop it)
+                aP = aE + aW + aN + aS + (Phi**2) * Vp
+                 
             # -------------------------
             # Fill matrix row
             # Equation: aE*psi_E + aW*psi_W + aN*psi_N + aS*psi_S - aP*psi_P = -b
