@@ -59,7 +59,7 @@ def main():
     plot_compare_sphere_cyl(lam_line, psi_t0, psi_tpi, Phi)
 
     # Q5/Q6: sweep R0
-    R0_list = np.array([0.015, 0.03, 0.06, 0.12, 0.25, 0.5, 1.0])  
+    R0_list = np.array([0.015, 0.03, 0.06, 0.12, 0.25])  
     sweep_major_radius(R0_list, r0, Phi, Nl, Nt)
 
 
