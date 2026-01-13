@@ -53,7 +53,7 @@ def main():
     lam_line, psi_t0, psi_tpi = extract_lines(psi, lam, theta)
     plot_lines(lam_line, psi_t0, psi_tpi,
            xlabel=r'$\lambda$ [-]', ylabel=r'$\psi$ [-]',
-           title="Q3: radial profiles at θ=0 and θ=π")
+           title="")
 
     # Q4: compare with sphere and cylinder
     plot_compare_sphere_cyl(lam_line, psi_t0, psi_tpi, Phi)
@@ -222,7 +222,7 @@ def plot_cross_section_polar(psi, Nl, Nt, cmap):
     pcm = ax.pcolormesh(th_edges, r_edges, psi, shading='auto', cmap=cmap)
     fig.colorbar(pcm, ax=ax, label=r'$\psi$ [-]')
 
-    ax.set_title('Q2: Dimensionless concentration profile (polar)')
+    ax.set_title('')
     ax.set_rlabel_position(90)
     plt.tight_layout()
     plt.show()
