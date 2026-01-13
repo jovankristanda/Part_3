@@ -336,7 +336,7 @@ def sweep_major_radius(R0_list, r0, Phi, Nl, Nt):
         plt.gca().invert_xaxis()
         plt.xlabel(r'$\lambda$ [-]')
         plt.ylabel(r'$\psi$ [-]')
-        plt.title(f'Q5: δ={delta:.1f}')
+        plt.title(f"Q5: $\\hat{{R_0}}$ = {delta:.1f}")
         plt.legend()
         plt.tight_layout()
         plt.show()
@@ -350,9 +350,9 @@ def sweep_major_radius(R0_list, r0, Phi, Nl, Nt):
 
     plt.figure(dpi=144)
     plt.plot(deltas, etas, 'o-', label='Torus (numerical)')
-    plt.axhline(eta_sph, linestyle='--', label='Sphere (analytical)')
+    plt.axhline(eta_sph, linestyle='--', label='Sphere (analytical)', color="green")
     if iv is not None:
-        plt.axhline(eta_cyl, linestyle='--', label='Cylinder (analytical)')
+        plt.axhline(eta_cyl, linestyle='--', label='Cylinder (analytical)', color="red")
 
     plt.grid(linestyle='--')
     plt.xlabel(r'$\delta=R_0/r_0$ [-]')
