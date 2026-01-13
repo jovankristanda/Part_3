@@ -325,7 +325,15 @@ def sweep_major_radius(R0_list, r0, Phi, Nl, Nt):
         plt.figure(dpi=144)
         plt.plot(lam_line, psi_t0, 'o-', label=r'$\theta=0$')
         plt.plot(lam_line, psi_tpi, 'o-', label=r'$\theta=\pi$')
+
+        ll = np.linspace(1e-6, 1.0, 400)
+        plt.plot(ll, analytical_sphere(ll, Phi), '--', label='Sphere (analytical)')
+
+        if iv is not None:
+            plt.plot(ll, analytical_cylinder(ll, Phi), '--', label='Cylinder (analytical)')
+
         plt.grid(linestyle='--')
+        plt.gca().invert_xaxis()
         plt.xlabel(r'$\lambda$ [-]')
         plt.ylabel(r'$\psi$ [-]')
         plt.title(f'Q5: δ={delta:.1f}')
